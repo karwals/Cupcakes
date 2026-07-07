@@ -1,8 +1,7 @@
-import Image from "next/image";
 import { Check, CircleDot, Clock3, Star } from "lucide-react";
 
 import SplitText from "@/components/SplitText";
-import { CupcakeOrderCombobox } from "@/components/cupcake-order-combobox";
+import { WeeklyCupcakes } from "@/components/weekly-cupcakes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,17 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const cupcakeFlavors = [
-  {
-    name: "Banana Bliss",
-    blurb: "Soft banana sponge, vanilla filling, and fluffy buttercream.",
-    price: "$7.50",
-    tag: "This Week",
-    flavorOptions: ["Chocolate chips", "No chocolate chips"],
-    flavorPlaceholder: "Select a flavour",
-  },
-];
 
 const steps = [
   {
@@ -100,49 +88,7 @@ export default function Home() {
           </div>
 
           <div className="reveal-up reveal-delay-2 relative">
-            <Card className="relative overflow-hidden border-border/70 bg-card/90 backdrop-blur-sm h-full flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-3xl">This Week's Cupcake</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  This week's featured flavor.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4 flex-1 flex flex-col">
-                {cupcakeFlavors.map((cupcake) => (
-                  <div
-                    key={cupcake.name}
-                    className="rounded-2xl border border-border/70 bg-background/60 p-4"
-                  >
-                    <div className="flex flex-col gap-4 sm:flex-row">
-                      <div className="shrink-0 rounded-lg overflow-hidden bg-linear-to-br from-pink-200 to-amber-100 w-32 h-32 relative">
-                        <Image
-                          src="/Cupcake.jpg"
-                          alt="This week's cupcake"
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="mb-2 flex items-center justify-between gap-3">
-                            <p className="font-semibold">{cupcake.name}</p>
-                            <Badge variant="secondary">{cupcake.tag}</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{cupcake.blurb}</p>
-                        </div>
-                        <p className="mt-3 text-sm font-semibold text-primary">{cupcake.price}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 w-full">
-                      <CupcakeOrderCombobox
-                        options={cupcake.flavorOptions}
-                        placeholder="Select a flavor"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+            <WeeklyCupcakes />
           </div>
         </div>
       </section>
