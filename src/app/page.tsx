@@ -1,65 +1,169 @@
 import Image from "next/image";
+import { Check, CircleDot, Clock3, Star } from "lucide-react";
+
+import SplitText from "@/components/SplitText";
+import { CupcakeOrderCombobox } from "@/components/cupcake-order-combobox";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+const cupcakeFlavors = [
+  {
+    name: "Banana Bliss",
+    blurb: "Soft banana sponge, vanilla filling, and fluffy buttercream.",
+    price: "$7.50",
+    tag: "This Week",
+    flavorOptions: ["Chocolate chips", "No chocolate chips"],
+    flavorPlaceholder: "Select a flavour",
+  },
+];
+
+const steps = [
+  {
+    title: "Made Weekly",
+    description: "Baked once each week and sold fresh until the box is gone.",
+    icon: Clock3,
+  },
+  {
+    title: "Hand-Frosted",
+    description: "Each cupcake is piped by hand with simple ingredients and no preservatives.",
+    icon: Star,
+  },
+  {
+    title: "Sold Fresh",
+    description: "Available once a week in a small run while supplies last.",
+    icon: Check,
+  },
+];
 
 export default function Home() {
+  
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="relative overflow-hidden bg-linear-to-b from-background via-background to-muted/60">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-primary/10 blur-3xl" />
+
+      <section className="flex w-full flex-col gap-12 px-6 pb-20 pt-12 sm:px-10 lg:px-14 lg:pb-24 lg:pt-16">
+          <header className="reveal-up flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/15 text-primary">
+                <CircleDot className="h-5 w-5" />
+              </div>
+              <p className="font-heading text-2xl leading-none tracking-tight">Salted Caramel Cloud</p>
+            </div>
+            <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+              Order Now
+            </Button>
+          </header>
+
+          <div className="grid items-stretch gap-10 lg:grid-cols-[1fr_1fr]">
+          <div className="reveal-up reveal-delay-1 space-y-8">
+            <Badge className="bg-accent text-accent-foreground">Baked Weekly in Small Batches</Badge>
+            <div className="space-y-5">
+              <SplitText
+                tag="h1"
+                text="Cupcakes That Look Like Art and Taste Like Home."
+                className="font-heading text-5xl leading-[0.98] tracking-tight text-foreground sm:text-6xl lg:text-7xl"
+                delay={35}
+                duration={0.75}
+                ease="power3.out"
+                splitType="words"
+                from={{ opacity: 0, y: 24 }}
+                to={{ opacity: 1, y: 0 }}
+                threshold={0.2}
+                rootMargin="-80px"
+                textAlign="left"
+              />
+              <p className="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+                Fresh cupcakes made weekly with quality ingredients, simple flavors, and no preservatives.
+                Perfect for birthdays, events, or just a sweet treat.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button size="lg" className="bg-primary text-primary-foreground">
+                Shop Cupcakes
+              </Button>
+              <Button size="lg" variant="outline">
+                See Menu
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
+              <p className="inline-flex items-center gap-2">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                Fresh weekly favourites from our kitchen
+              </p>
+            </div>
+          </div>
+
+          <div className="reveal-up reveal-delay-2 relative">
+            <Card className="relative overflow-hidden border-border/70 bg-card/90 backdrop-blur-sm h-full flex flex-col">
+              <CardHeader>
+                <CardTitle className="text-3xl">This Week's Cupcake</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  This week's featured flavor.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4 flex-1 flex flex-col">
+                {cupcakeFlavors.map((cupcake) => (
+                  <div
+                    key={cupcake.name}
+                    className="rounded-2xl border border-border/70 bg-background/60 p-4"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                      <div className="shrink-0 rounded-lg overflow-hidden bg-linear-to-br from-pink-200 to-amber-100 w-32 h-32 relative">
+                        <Image
+                          src="/Cupcake.jpg"
+                          alt="This week's cupcake"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <p className="font-semibold">{cupcake.name}</p>
+                            <Badge variant="secondary">{cupcake.tag}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{cupcake.blurb}</p>
+                        </div>
+                        <p className="mt-3 text-sm font-semibold text-primary">{cupcake.price}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 w-full">
+                      <CupcakeOrderCombobox
+                        options={cupcake.flavorOptions}
+                        placeholder="Select a flavor"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="w-full px-6 pb-20 sm:px-10 lg:px-14">
+        <div className="reveal-up reveal-delay-2 grid gap-5 md:grid-cols-3">
+          {steps.map((step) => (
+            <Card key={step.title} className="bg-card/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <step.icon className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-2xl">{step.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-6 text-muted-foreground">{step.description}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }
