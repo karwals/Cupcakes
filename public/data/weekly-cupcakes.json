@@ -8,5 +8,15 @@
       "Chocolate chips",
       "No chocolate chips"
     ]
+  },
+  {
+    "id": "vanilla-cupcakes-1783487032493",
+    "name": "vanilla cupcakes",
+    "blurb": "very cool",
+    "price": "$19.00",
+    "flavorOptions": [
+      "white chocolate chips",
+      "no white chocolate chips"
+    ]
   }
 ]
