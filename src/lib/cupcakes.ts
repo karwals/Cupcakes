@@ -123,8 +123,41 @@ export async function publishCupcakesToGitHub(cupcakes: WeeklyCupcake[], token: 
     throw new Error("Add a GitHub token before publishing.");
   }
 
+  const content = toBase64(JSON.stringify(cupcakes, null, 2) + "\n");
+  let lastError = "Could not publish the cupcake update to GitHub.";
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const sha = await getGitHubCupcakeFileSha(trimmedToken);
+    const updateResponse = await fetch(GITHUB_API_URL, {
+      method: "PUT",
+      cache: "no-store",
+      headers: getGitHubHeaders(trimmedToken),
+      body: JSON.stringify({
+        branch: GITHUB_REPO_BRANCH,
+        content,
+        message: "Update weekly cupcakes",
+        sha,
+      }),
+    });
+
+    if (updateResponse.ok) {
+      return;
+    }
+
+    lastError = await getGitHubErrorMessage(updateResponse, "Could not publish the cupcake update to GitHub.");
+
+    if (updateResponse.status !== 409) {
+      break;
+    }
+  }
+
+  throw new Error(lastError);
+}
+
+async function getGitHubCupcakeFileSha(token: string) {
   const fileResponse = await fetch(`${GITHUB_API_URL}?ref=${GITHUB_REPO_BRANCH}`, {
-    headers: getGitHubHeaders(trimmedToken),
+    cache: "no-store",
+    headers: getGitHubHeaders(token),
   });
 
   if (!fileResponse.ok) {
@@ -137,20 +170,7 @@ export async function publishCupcakesToGitHub(cupcakes: WeeklyCupcake[], token: 
     throw new Error("GitHub did not return a file version for the cupcake file.");
   }
 
-  const updateResponse = await fetch(GITHUB_API_URL, {
-    method: "PUT",
-    headers: getGitHubHeaders(trimmedToken),
-    body: JSON.stringify({
-      branch: GITHUB_REPO_BRANCH,
-      content: toBase64(JSON.stringify(cupcakes, null, 2) + "\n"),
-      message: "Update weekly cupcakes",
-      sha: fileData.sha,
-    }),
-  });
-
-  if (!updateResponse.ok) {
-    throw new Error(await getGitHubErrorMessage(updateResponse, "Could not publish the cupcake update to GitHub."));
-  }
+  return fileData.sha;
 }
 
 export function createCupcakeId(name: string) {
