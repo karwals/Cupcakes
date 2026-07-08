@@ -1,15 +1,5 @@
 [
   {
-    "id": "banana-bliss",
-    "name": "Banana Bliss",
-    "blurb": "Soft banana sponge, vanilla filling, and fluffy buttercream.",
-    "price": "$7.50",
-    "flavorOptions": [
-      "Chocolate chips",
-      "No chocolate chips"
-    ]
-  },
-  {
     "id": "vanilla-cupcakes-1783487032493",
     "name": "vanilla cupcakes",
     "blurb": "very cool",
