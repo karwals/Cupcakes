@@ -15,6 +15,7 @@ import {
   CUPCAKES_UPDATED_EVENT,
   defaultWeeklyCupcakes,
   getStoredCupcakes,
+  loadPublishedCupcakes,
   type WeeklyCupcake,
 } from "@/lib/cupcakes";
 
@@ -23,12 +24,21 @@ export function WeeklyCupcakes() {
 
   useEffect(() => {
     const syncCupcakes = () => setCupcakes(getStoredCupcakes());
+    const syncPublishedCupcakes = async () => {
+      try {
+        setCupcakes(await loadPublishedCupcakes());
+      } catch {
+        syncCupcakes();
+      }
+    };
 
-    syncCupcakes();
+    void syncPublishedCupcakes();
+    const syncInterval = window.setInterval(() => void syncPublishedCupcakes(), 60_000);
     window.addEventListener("storage", syncCupcakes);
     window.addEventListener(CUPCAKES_UPDATED_EVENT, syncCupcakes);
 
     return () => {
+      window.clearInterval(syncInterval);
       window.removeEventListener("storage", syncCupcakes);
       window.removeEventListener(CUPCAKES_UPDATED_EVENT, syncCupcakes);
     };

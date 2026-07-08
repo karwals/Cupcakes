@@ -1,8 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, BadgeDollarSign, Plus, RotateCcw, Save, Sparkles, Trash2 } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  BadgeDollarSign,
+  KeyRound,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,7 +27,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createCupcakeId,
   defaultWeeklyCupcakes,
+  clearStoredGitHubToken,
+  getStoredGitHubToken,
   getStoredCupcakes,
+  loadPublishedCupcakes,
+  publishCupcakesToGitHub,
+  saveStoredGitHubToken,
   saveStoredCupcakes,
   type WeeklyCupcake,
 } from "@/lib/cupcakes";
@@ -30,6 +45,8 @@ type CupcakeForm = {
   flavorOptions: string;
 };
 
+type SyncStatus = "idle" | "loading" | "saving" | "success" | "error";
+
 const emptyForm: CupcakeForm = {
   name: "",
   blurb: "",
@@ -39,6 +56,10 @@ const emptyForm: CupcakeForm = {
 
 export function AdminCupcakes() {
   const [cupcakes, setCupcakes] = useState<WeeklyCupcake[]>(() => getStoredCupcakes());
+  const [githubToken, setGitHubToken] = useState(() => getStoredGitHubToken());
+  const [githubTokenInput, setGitHubTokenInput] = useState(() => getStoredGitHubToken());
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncMessage, setSyncMessage] = useState("Ready to load or publish the shared cupcake list.");
   const [form, setForm] = useState<CupcakeForm>({
     name: "Salted Caramel Cloud",
     blurb: "Brown sugar sponge, salted caramel center, and silky vanilla frosting.",
@@ -47,13 +68,55 @@ export function AdminCupcakes() {
   });
 
   const flavorPreview = useMemo(() => getFlavorOptions(form.flavorOptions), [form.flavorOptions]);
+  const hasGitHubToken = githubToken.trim().length > 0;
+  const isSyncing = syncStatus === "loading" || syncStatus === "saving";
 
-  function updateCupcakes(nextCupcakes: WeeklyCupcake[]) {
-    setCupcakes(nextCupcakes);
-    saveStoredCupcakes(nextCupcakes);
+  useEffect(() => {
+    void refreshCupcakes();
+  }, []);
+
+  async function refreshCupcakes() {
+    setSyncStatus("loading");
+    setSyncMessage("Loading the published cupcake list...");
+
+    try {
+      const publishedCupcakes = await loadPublishedCupcakes();
+
+      setCupcakes(publishedCupcakes);
+      setSyncStatus("success");
+      setSyncMessage("Loaded the published cupcake list.");
+    } catch (error) {
+      setCupcakes(getStoredCupcakes());
+      setSyncStatus("error");
+      setSyncMessage(getErrorMessage(error));
+    }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function updateCupcakes(nextCupcakes: WeeklyCupcake[]) {
+    if (!hasGitHubToken) {
+      setSyncStatus("error");
+      setSyncMessage("Save a GitHub token before publishing changes for everyone.");
+      return false;
+    }
+
+    setCupcakes(nextCupcakes);
+    saveStoredCupcakes(nextCupcakes);
+    setSyncStatus("saving");
+    setSyncMessage("Publishing to GitHub...");
+
+    try {
+      await publishCupcakesToGitHub(nextCupcakes, githubToken);
+      setSyncStatus("success");
+      setSyncMessage("Published to GitHub. GitHub Pages will update after the deploy finishes.");
+      return true;
+    } catch (error) {
+      setSyncStatus("error");
+      setSyncMessage(getErrorMessage(error));
+      return false;
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const name = form.name.trim();
@@ -65,7 +128,7 @@ export function AdminCupcakes() {
       return;
     }
 
-    updateCupcakes([
+    const didPublish = await updateCupcakes([
       ...cupcakes,
       {
         id: createCupcakeId(name),
@@ -75,23 +138,53 @@ export function AdminCupcakes() {
         flavorOptions,
       },
     ]);
-    setForm(emptyForm);
+
+    if (didPublish) {
+      setForm(emptyForm);
+    }
   }
 
   function removeCupcake(id: string) {
     const nextCupcakes = cupcakes.filter((cupcake) => cupcake.id !== id);
-    updateCupcakes(nextCupcakes.length > 0 ? nextCupcakes : defaultWeeklyCupcakes);
+    void updateCupcakes(nextCupcakes.length > 0 ? nextCupcakes : defaultWeeklyCupcakes);
   }
 
   function resetCupcakes() {
-    updateCupcakes(defaultWeeklyCupcakes);
+    void updateCupcakes(defaultWeeklyCupcakes);
   }
 
-  const canSave =
+  function saveGitHubToken() {
+    const nextToken = githubTokenInput.trim();
+
+    if (!nextToken) {
+      clearStoredGitHubToken();
+      setGitHubToken("");
+      setSyncStatus("error");
+      setSyncMessage("Paste a GitHub token before saving.");
+      return;
+    }
+
+    saveStoredGitHubToken(nextToken);
+    setGitHubToken(nextToken);
+    setGitHubTokenInput(nextToken);
+    setSyncStatus("success");
+    setSyncMessage("GitHub token saved in this browser.");
+  }
+
+  function forgetGitHubToken() {
+    clearStoredGitHubToken();
+    setGitHubToken("");
+    setGitHubTokenInput("");
+    setSyncStatus("idle");
+    setSyncMessage("GitHub token removed from this browser.");
+  }
+
+  const canSave = Boolean(
     form.name.trim() &&
     form.blurb.trim() &&
     normalizeCupcakePrice(form.price) !== null &&
-    flavorPreview.length > 0;
+    flavorPreview.length > 0
+  );
 
   return (
     <main className="min-h-screen bg-linear-to-b from-background via-muted/30 to-background">
@@ -111,7 +204,7 @@ export function AdminCupcakes() {
                 Weekly cupcake control
               </h1>
               <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-                Add the cupcakes you want featured on the main page. Your changes save in this browser for now.
+                Add the cupcakes you want featured on the main page and publish them to the shared site.
               </p>
             </div>
           </div>
@@ -119,6 +212,46 @@ export function AdminCupcakes() {
             <Metric label="Active cupcakes" value={cupcakes.length.toString()} />
           </div>
         </header>
+
+        <Card className="rounded-2xl border-border/70 bg-card/90">
+          <CardHeader className="pb-4">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <CardTitle>GitHub publishing</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Use a fine-grained token with contents read and write access for karwals/Cupcakes.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
+              <label className="grid gap-2 text-sm font-medium">
+                GitHub token
+                <Input
+                  type="password"
+                  value={githubTokenInput}
+                  onChange={(event) => setGitHubTokenInput(event.target.value)}
+                  placeholder="github_pat_..."
+                  autoComplete="off"
+                />
+              </label>
+              <Button type="button" onClick={saveGitHubToken}>
+                <KeyRound className="h-4 w-4" />
+                Save token
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void refreshCupcakes()} disabled={isSyncing}>
+                <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                Reload
+              </Button>
+              <Button type="button" variant="outline" onClick={forgetGitHubToken} disabled={!hasGitHubToken}>
+                Forget
+              </Button>
+            </div>
+            <p className={cn("text-sm font-medium", getSyncStatusClassName(syncStatus))}>
+              {syncMessage}
+            </p>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <Card className="rounded-2xl border-border/70 bg-card/90">
@@ -184,9 +317,9 @@ export function AdminCupcakes() {
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="submit" size="lg" disabled={!canSave}>
+                  <Button type="submit" size="lg" disabled={!canSave || !hasGitHubToken || isSyncing}>
                     <Save className="h-4 w-4" />
-                    Save cupcake
+                    Publish cupcake
                   </Button>
                   <Button
                     type="button"
@@ -209,7 +342,7 @@ export function AdminCupcakes() {
                   These are the cupcakes currently shown on the landing page.
                 </p>
               </div>
-              <Button type="button" variant="outline" onClick={resetCupcakes}>
+              <Button type="button" variant="outline" onClick={resetCupcakes} disabled={!hasGitHubToken || isSyncing}>
                 <RotateCcw className="h-4 w-4" />
                 Reset
               </Button>
@@ -252,6 +385,7 @@ export function AdminCupcakes() {
                       variant="destructive"
                       size="icon"
                       aria-label={`Remove ${cupcake.name}`}
+                      disabled={!hasGitHubToken || isSyncing}
                       onClick={() => removeCupcake(cupcake.id)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -293,4 +427,20 @@ function normalizeCupcakePrice(value: string) {
   }
 
   return `$${Number(cleanedValue).toFixed(2)}`;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong while syncing cupcakes.";
+}
+
+function getSyncStatusClassName(status: SyncStatus) {
+  if (status === "success") {
+    return "text-emerald-700";
+  }
+
+  if (status === "error") {
+    return "text-destructive";
+  }
+
+  return "text-muted-foreground";
 }
