@@ -4,6 +4,9 @@
     "name": "Banana Bliss",
     "blurb": "Soft banana sponge, vanilla filling, and fluffy buttercream.",
     "price": "$7.50",
-    "flavorOptions": ["Chocolate chips", "No chocolate chips"]
+    "flavorOptions": [
+      "Chocolate chips",
+      "No chocolate chips"
+    ]
   }
 ]
