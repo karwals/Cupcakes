@@ -8,5 +8,15 @@
       "white chocolate chips",
       "no white chocolate chips"
     ]
+  },
+  {
+    "id": "test-1783496218082",
+    "name": "Test",
+    "blurb": "Test",
+    "price": "$20.00",
+    "flavorOptions": [
+      "Test1",
+      "Test2"
+    ]
   }
 ]
