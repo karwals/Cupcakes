@@ -8,5 +8,15 @@
       "Chocolate chips",
       "No chocolate chips"
     ]
+  },
+  {
+    "id": "chocolate-1783486588264",
+    "name": "chocolate",
+    "blurb": "yummm.....",
+    "price": "$12.00",
+    "flavorOptions": [
+      "white chocolate",
+      "no white chocolate"
+    ]
   }
 ]
