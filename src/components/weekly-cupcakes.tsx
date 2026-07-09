@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import { ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { CupcakeOrderCombobox } from "@/components/cupcake-order-combobox";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -47,15 +49,21 @@ export function WeeklyCupcakes() {
   return (
     <Card className="relative flex h-full flex-col overflow-hidden border-border/70 bg-card/90 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-3xl">This Week&apos;s Cupcake</CardTitle>
+        <CardTitle className="text-3xl">This Week&apos;s Special</CardTitle>
         <p className="text-sm text-muted-foreground">
           Freshly featured flavors from this week&apos;s bake.
         </p>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col space-y-4">
+      <CardContent className="flex flex-1 flex-col gap-4">
         {cupcakes.map((cupcake) => (
           <CupcakeCard key={cupcake.id} cupcake={cupcake} />
         ))}
+        <div className="mt-auto border-t border-border/70 pt-4">
+          <Button type="button" size="lg" className="w-full">
+            <ShoppingBag />
+            Order Now
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

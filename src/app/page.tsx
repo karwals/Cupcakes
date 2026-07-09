@@ -3,7 +3,6 @@ import { Check, CircleDot, Clock3, Star } from "lucide-react";
 import SplitText from "@/components/SplitText";
 import { WeeklyCupcakes } from "@/components/weekly-cupcakes";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -43,9 +42,7 @@ export default function Home() {
               </div>
               <p className="font-heading text-2xl leading-none tracking-tight">Salted Caramel Cloud</p>
             </div>
-            <Button variant="outline" size="sm" className="hidden sm:inline-flex">
-              Order Now
-            </Button>
+            
           </header>
 
           <div className="grid items-stretch gap-10 lg:grid-cols-[1fr_1fr]">
@@ -70,14 +67,6 @@ export default function Home() {
                 Fresh cupcakes made weekly with quality ingredients, simple flavors, and no preservatives.
                 Perfect for birthdays, events, or just a sweet treat.
               </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" className="bg-primary text-primary-foreground">
-                Shop Cupcakes
-              </Button>
-              <Button size="lg" variant="outline">
-                See Menu
-              </Button>
             </div>
             <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
               <p className="inline-flex items-center gap-2">
