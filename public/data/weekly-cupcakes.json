@@ -10,16 +10,6 @@
     ]
   },
   {
-    "id": "test-1783496218082",
-    "name": "Test",
-    "blurb": "Test",
-    "price": "$20.00",
-    "flavorOptions": [
-      "Test1",
-      "Test2"
-    ]
-  },
-  {
     "id": "fluffy-1783588365631",
     "name": "fluffy",
     "blurb": "purple",
