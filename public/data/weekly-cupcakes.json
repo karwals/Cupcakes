@@ -18,5 +18,15 @@
       "Test1",
       "Test2"
     ]
+  },
+  {
+    "id": "fluffy-1783588365631",
+    "name": "fluffy",
+    "blurb": "purple",
+    "price": "$10.00",
+    "flavorOptions": [
+      "swirlycloud",
+      "frostnot"
+    ]
   }
 ]
