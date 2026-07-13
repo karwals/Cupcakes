@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { Check, CircleDot, Clock3, Star } from "lucide-react";
 
 import SplitText from "@/components/SplitText";
+import { CurrentCupcakeName } from "@/components/current-cupcake-name";
 import { WeeklyCupcakes } from "@/components/weekly-cupcakes";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,6 +30,10 @@ const steps = [
   },
 ];
 
+export const metadata: Metadata = {
+  title: "Weekly Cupcakes",
+};
+
 export default function Home() {
   
   return (
@@ -36,11 +42,13 @@ export default function Home() {
 
       <section className="flex w-full flex-col gap-12 px-6 pb-20 pt-12 sm:px-10 lg:px-14 lg:pb-24 lg:pt-16">
           <header className="reveal-up flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/15 text-primary">
                 <CircleDot className="h-5 w-5" />
               </div>
-              <p className="font-heading text-2xl leading-none tracking-tight">Salted Caramel Cloud</p>
+              <p className="min-w-0 break-words font-heading text-2xl leading-tight tracking-tight">
+                <CurrentCupcakeName />
+              </p>
             </div>
             
           </header>

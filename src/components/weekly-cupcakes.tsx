@@ -16,13 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  CUPCAKES_UPDATED_EVENT,
-  defaultWeeklyCupcakes,
-  getStoredCupcakes,
-  loadPublishedCupcakes,
-  type WeeklyCupcake,
-} from "@/lib/cupcakes";
+import { useWeeklyCupcakes } from "@/hooks/use-weekly-cupcakes";
+import { type WeeklyCupcake } from "@/lib/cupcakes";
 import { cn } from "@/lib/utils";
 
 type OrderSelection = {
@@ -47,7 +42,7 @@ const emptyOrderForm: OrderForm = {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function WeeklyCupcakes() {
-  const [cupcakes, setCupcakes] = useState<WeeklyCupcake[]>(defaultWeeklyCupcakes);
+  const cupcakes = useWeeklyCupcakes();
   const [selectedOrder, setSelectedOrder] = useState<OrderSelection | null>(null);
   const [isOrderOpen, setIsOrderOpen] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
@@ -65,28 +60,6 @@ export function WeeklyCupcakes() {
     [orderForm],
   );
   const canReviewOrder = contactStatus.name && contactStatus.email && contactStatus.phone;
-
-  useEffect(() => {
-    const syncCupcakes = () => setCupcakes(getStoredCupcakes());
-    const syncPublishedCupcakes = async () => {
-      try {
-        setCupcakes(await loadPublishedCupcakes());
-      } catch {
-        syncCupcakes();
-      }
-    };
-
-    void syncPublishedCupcakes();
-    const syncInterval = window.setInterval(() => void syncPublishedCupcakes(), 60_000);
-    window.addEventListener("storage", syncCupcakes);
-    window.addEventListener(CUPCAKES_UPDATED_EVENT, syncCupcakes);
-
-    return () => {
-      window.clearInterval(syncInterval);
-      window.removeEventListener("storage", syncCupcakes);
-      window.removeEventListener(CUPCAKES_UPDATED_EVENT, syncCupcakes);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isOrderOpen || orderStep !== 1) {
