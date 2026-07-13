@@ -12,16 +12,24 @@ import {
 type CupcakeOrderComboboxProps = {
   options: string[];
   placeholder?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
 };
 
 export function CupcakeOrderCombobox({
   options,
   placeholder = "Select an option",
+  value = "",
+  onValueChange,
 }: CupcakeOrderComboboxProps) {
   const anchorRef = useComboboxAnchor();
 
   return (
-    <Combobox items={options}>
+    <Combobox
+      items={options}
+      value={value || null}
+      onValueChange={(nextValue) => onValueChange?.(typeof nextValue === "string" ? nextValue : "")}
+    >
       <div ref={anchorRef} className="w-full">
         <ComboboxInput
           className="w-full"
@@ -30,6 +38,7 @@ export function CupcakeOrderCombobox({
           readOnly
           inputMode="none"
           autoComplete="off"
+          showClear={Boolean(value)}
         />
       </div>
 
