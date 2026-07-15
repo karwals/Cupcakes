@@ -25,20 +25,25 @@ export default function Stepper({
 }) {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [direction, setDirection] = useState(0);
+  const [isFinalActionPending, setIsFinalActionPending] = useState(false);
+  const finalActionPendingRef = useRef(false);
   const stepsArray = Children.toArray(children);
   const totalSteps = stepsArray.length;
   const isCompleted = currentStep > totalSteps;
   const isLastStep = currentStep === totalSteps;
   const { className: backButtonClassName = '', ...restBackButtonProps } = backButtonProps;
   const { className: nextButtonClassName = '', ...restNextButtonProps } = nextButtonProps;
+  const isNextButtonDisabled = Boolean(restNextButtonProps.disabled) || (isLastStep && isFinalActionPending);
 
   const updateStep = newStep => {
     setCurrentStep(newStep);
-    if (newStep > totalSteps) {
-      onFinalStepCompleted();
-    } else {
+    if (newStep <= totalSteps) {
       onStepChange(newStep);
     }
+  };
+
+  const completeStep = () => {
+    setCurrentStep(totalSteps + 1);
   };
 
   const handleBack = () => {
@@ -55,9 +60,38 @@ export default function Stepper({
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    if (finalActionPendingRef.current) {
+      return;
+    }
+
+    finalActionPendingRef.current = true;
     setDirection(1);
-    updateStep(totalSteps + 1);
+
+    try {
+      const completionResult = onFinalStepCompleted();
+
+      if (completionResult && typeof completionResult.then === 'function') {
+        setIsFinalActionPending(true);
+
+        const shouldComplete = await completionResult;
+
+        if (shouldComplete !== false) {
+          completeStep();
+        }
+
+        return;
+      }
+
+      if (completionResult !== false) {
+        completeStep();
+      }
+    } catch (error) {
+      console.error('Stepper final action failed', error);
+    } finally {
+      finalActionPendingRef.current = false;
+      setIsFinalActionPending(false);
+    }
   };
 
   return (
@@ -122,6 +156,7 @@ export default function Stepper({
                 onClick={isLastStep ? handleComplete : handleNext}
                 className={`next-button ${nextButtonClassName}`}
                 {...restNextButtonProps}
+                disabled={isNextButtonDisabled}
               >
                 {isLastStep ? completeButtonText : nextButtonText}
               </button>
@@ -179,7 +214,7 @@ function SlideTransition({ children, direction, onHeightReady }) {
 
 const stepVariants = {
   enter: dir => ({
-    x: dir >= 0 ? '-100%' : '100%',
+    x: dir >= 0 ? '100%' : '-100%',
     opacity: 0
   }),
   center: {
@@ -187,7 +222,7 @@ const stepVariants = {
     opacity: 1
   },
   exit: dir => ({
-    x: dir >= 0 ? '50%' : '-50%',
+    x: dir >= 0 ? '-50%' : '50%',
     opacity: 0
   })
 };
