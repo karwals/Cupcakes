@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Minus, Plus, ReceiptText, ShoppingBag, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 
 import Stepper, { Step } from "@/components/Stepper";
 import { CupcakeOrderCombobox } from "@/components/cupcake-order-combobox";
@@ -127,6 +128,39 @@ export function WeeklyCupcakes() {
 
     return () => window.clearTimeout(focusTimer);
   }, [isOrderOpen, orderStep]);
+
+  useEffect(() => {
+    if (!isOrderOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOrderOpen]);
+
+  useEffect(() => {
+    if (!isOrderOpen) {
+      return;
+    }
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape" || isSendingConfirmation) {
+        return;
+      }
+
+      setIsOrderOpen(false);
+      setOrderStep(1);
+      setOrderErrorMessage("");
+    }
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOrderOpen, isSendingConfirmation]);
 
   function getCupcakeQuantity(cupcakeId: string) {
     return quantityByCupcakeId[cupcakeId] ?? quantityMinimum;
@@ -286,74 +320,95 @@ export function WeeklyCupcakes() {
   }
 
   return (
-    <Card className="relative flex h-full flex-col overflow-hidden border-border/70 bg-card/90 backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle className="text-3xl">This Week&apos;s Special</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Freshly featured flavors from this week&apos;s bake.
-        </p>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
-        {cupcakes.map((cupcake) => (
-          <CupcakeCard
-            key={cupcake.id}
-            cupcake={cupcake}
-            selectedFlavor={selectedOrder?.cupcakeId === cupcake.id ? selectedOrder.flavor : ""}
-            quantity={getCupcakeQuantity(cupcake.id)}
-            onFlavorChange={(flavor) => selectCupcakeFlavor(cupcake, flavor)}
-            onQuantityChange={(quantity) => updateCupcakeQuantity(cupcake, quantity)}
-          />
-        ))}
-        <div className="mt-auto border-t border-border/70 pt-4">
-          <Button
-            type="button"
-            size="lg"
-            className="w-full"
-            disabled={!selectedOrder}
-            aria-describedby="order-button-help"
-            onClick={startOrder}
-          >
-            <ShoppingBag />
-            Order Now
-          </Button>
-          <p id="order-button-help" className="mt-2 text-center text-xs text-muted-foreground">
-            {selectedOrder
-              ? `${selectedOrder.quantity} x ${selectedOrder.flavor} selected. You're ready to order.`
-              : "Select a flavor above to unlock ordering."}
+    <>
+      <Card className="relative flex h-full flex-col overflow-hidden border-border/70 bg-card/90 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="text-3xl">This Week&apos;s Special</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Freshly featured flavors from this week&apos;s bake.
           </p>
-          {orderMessage && (
-            <p className="mt-2 rounded-md bg-primary/10 px-3 py-2 text-center text-xs font-medium text-primary">
-              {orderMessage}
-            </p>
-          )}
-        </div>
-      </CardContent>
-      {isOrderOpen && selectedOrder && (
-        <section className="border-t border-border/70 bg-background/45 px-4 py-5 sm:px-6">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <h3 className="font-heading text-2xl leading-tight">Order this week&apos;s special</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Add your details, then check the receipt before finishing.
-              </p>
-            </div>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col gap-4">
+          {cupcakes.map((cupcake) => (
+            <CupcakeCard
+              key={cupcake.id}
+              cupcake={cupcake}
+              selectedFlavor={selectedOrder?.cupcakeId === cupcake.id ? selectedOrder.flavor : ""}
+              quantity={getCupcakeQuantity(cupcake.id)}
+              onFlavorChange={(flavor) => selectCupcakeFlavor(cupcake, flavor)}
+              onQuantityChange={(quantity) => updateCupcakeQuantity(cupcake, quantity)}
+            />
+          ))}
+          <div className="mt-auto border-t border-border/70 pt-4">
             <Button
               type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Cancel order"
-              disabled={isSendingConfirmation}
-              onClick={cancelOrder}
+              size="lg"
+              className="w-full"
+              disabled={!selectedOrder}
+              aria-describedby="order-button-help"
+              onClick={startOrder}
             >
-              <X className="size-4" />
+              <ShoppingBag />
+              Order Now
             </Button>
+            <p id="order-button-help" className="mt-2 text-center text-xs text-muted-foreground">
+              {selectedOrder
+                ? `${selectedOrder.quantity} x ${selectedOrder.flavor} selected. You're ready to order.`
+                : "Select a flavor above to unlock ordering."}
+            </p>
+            {orderMessage && (
+              <p className="mt-2 rounded-md bg-primary/10 px-3 py-2 text-center text-xs font-medium text-primary">
+                {orderMessage}
+              </p>
+            )}
           </div>
-
-          <Stepper
+        </CardContent>
+      </Card>
+      {isOrderOpen &&
+        selectedOrder &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/55 p-4 backdrop-blur-[2px] sm:p-6"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                cancelOrder();
+              }
+            }}
+          >
+            <Stepper
               key={orderReference || "order-stepper"}
+              className="order-dialog-stepper"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="order-dialog-title"
               initialStep={1}
               onStepChange={(step?: number) => setOrderStep(step ?? 1)}
               onFinalStepCompleted={completeOrder}
+              header={
+                <div className="flex items-start justify-between gap-4 px-5 pt-5">
+                  <div>
+                    <h2 id="order-dialog-title" className="font-heading text-2xl leading-tight">
+                      Order this week&apos;s special
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Add your details, then check the receipt before finishing.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label="Cancel order"
+                    disabled={isSendingConfirmation}
+                    onClick={cancelOrder}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              }
+              stepCircleContainerClassName="order-stepper-popup"
               backButtonProps={{
                 disabled: isSendingConfirmation,
               }}
@@ -516,10 +571,11 @@ export function WeeklyCupcakes() {
                   </p>
                 </div>
               </Step>
-          </Stepper>
-        </section>
-      )}
-    </Card>
+            </Stepper>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

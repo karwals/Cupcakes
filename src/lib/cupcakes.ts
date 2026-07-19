@@ -6,17 +6,26 @@ export type WeeklyCupcake = {
   flavorOptions: string[];
 };
 
-export const CUPCAKES_STORAGE_KEY = "velvet-crumb-weekly-cupcakes";
-export const CUPCAKES_UPDATED_EVENT = "velvet-crumb-cupcakes-updated";
-export const GITHUB_TOKEN_STORAGE_KEY = "velvet-crumb-github-token";
+export type CupcakeValidationResult =
+  | {
+      success: true;
+      cupcakes: WeeklyCupcake[];
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
-const SITE_BASE_PATH = "/Cupcakes";
 const CUPCAKES_PUBLIC_PATH = "/data/weekly-cupcakes.json";
-const CUPCAKES_REPO_PATH = "public/data/weekly-cupcakes.json";
-const GITHUB_REPO_OWNER = "karwals";
-const GITHUB_REPO_NAME = "Cupcakes";
-const GITHUB_REPO_BRANCH = "master";
-const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${CUPCAKES_REPO_PATH}`;
+
+const MAX_CUPCAKES = 24;
+const MAX_ID_LENGTH = 80;
+const MAX_NAME_LENGTH = 80;
+const MAX_BLURB_LENGTH = 240;
+const MAX_PRICE_LENGTH = 20;
+const MAX_FLAVOR_OPTIONS = 24;
+const MAX_FLAVOR_OPTION_LENGTH = 80;
+const CUPCAKE_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 export const defaultWeeklyCupcakes: WeeklyCupcake[] = [
   {
@@ -28,195 +37,295 @@ export const defaultWeeklyCupcakes: WeeklyCupcake[] = [
   },
 ];
 
-function isWeeklyCupcake(value: unknown): value is WeeklyCupcake {
-  if (!value || typeof value !== "object") {
-    return false;
+export function validateWeeklyCupcakes(value: unknown): CupcakeValidationResult {
+  if (!Array.isArray(value)) {
+    return {
+      success: false,
+      error: "Cupcake data must be an array.",
+    };
   }
 
-  const cupcake = value as WeeklyCupcake;
-
-  return (
-    typeof cupcake.id === "string" &&
-    typeof cupcake.name === "string" &&
-    typeof cupcake.blurb === "string" &&
-    typeof cupcake.price === "string" &&
-    Array.isArray(cupcake.flavorOptions) &&
-    cupcake.flavorOptions.every((option) => typeof option === "string")
-  );
-}
-
-function parseWeeklyCupcakes(value: unknown) {
-  if (Array.isArray(value) && value.every(isWeeklyCupcake)) {
-    return value.length > 0 ? value : defaultWeeklyCupcakes;
+  if (value.length === 0) {
+    return {
+      success: false,
+      error: "Add at least one cupcake before publishing.",
+    };
   }
 
-  return null;
-}
-
-export function getStoredCupcakes() {
-  if (typeof window === "undefined") {
-    return defaultWeeklyCupcakes;
+  if (value.length > MAX_CUPCAKES) {
+    return {
+      success: false,
+      error: `Please publish ${MAX_CUPCAKES} cupcakes or fewer.`,
+    };
   }
 
-  const savedCupcakes = window.localStorage.getItem(CUPCAKES_STORAGE_KEY);
+  const ids = new Set<string>();
+  const cupcakes: WeeklyCupcake[] = [];
 
-  if (!savedCupcakes) {
-    return defaultWeeklyCupcakes;
-  }
+  for (let index = 0; index < value.length; index += 1) {
+    const cupcakeResult = normalizeWeeklyCupcake(value[index], index, ids);
 
-  try {
-    const parsedCupcakes = JSON.parse(savedCupcakes);
-    const cupcakes = parseWeeklyCupcakes(parsedCupcakes);
-
-    if (cupcakes) {
-      return cupcakes;
+    if (!cupcakeResult.success) {
+      return cupcakeResult;
     }
-  } catch {
-    return defaultWeeklyCupcakes;
+
+    cupcakes.push(cupcakeResult.cupcake);
+    ids.add(cupcakeResult.cupcake.id);
   }
 
-  return defaultWeeklyCupcakes;
-}
-
-export function saveStoredCupcakes(cupcakes: WeeklyCupcake[]) {
-  window.localStorage.setItem(CUPCAKES_STORAGE_KEY, JSON.stringify(cupcakes));
-  window.dispatchEvent(new Event(CUPCAKES_UPDATED_EVENT));
-}
-
-export function getStoredGitHubToken() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return window.localStorage.getItem(GITHUB_TOKEN_STORAGE_KEY) ?? "";
-}
-
-export function saveStoredGitHubToken(token: string) {
-  window.localStorage.setItem(GITHUB_TOKEN_STORAGE_KEY, token);
-}
-
-export function clearStoredGitHubToken() {
-  window.localStorage.removeItem(GITHUB_TOKEN_STORAGE_KEY);
+  return {
+    success: true,
+    cupcakes,
+  };
 }
 
 export async function loadPublishedCupcakes() {
-  const response = await fetch(getCupcakesDataUrl(), { cache: "no-store" });
+  try {
+    const response = await fetch(getCupcakesDataUrl(), {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    });
+
+    if (!response.ok) {
+      return defaultWeeklyCupcakes;
+    }
+
+    const validation = validateWeeklyCupcakes(await response.json());
+
+    return validation.success ? validation.cupcakes : defaultWeeklyCupcakes;
+  } catch {
+    return defaultWeeklyCupcakes;
+  }
+}
+
+export async function loadPublishedCupcakesStrict() {
+  const response = await fetch(getCupcakesDataUrl(), {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+    },
+  });
 
   if (!response.ok) {
     throw new Error("Could not load the published cupcake list.");
   }
 
-  const cupcakes = parseWeeklyCupcakes(await response.json());
+  const validation = validateWeeklyCupcakes(await response.json());
 
-  if (!cupcakes) {
-    throw new Error("The published cupcake list has invalid data.");
+  if (!validation.success) {
+    throw new Error(validation.error);
   }
 
-  saveStoredCupcakes(cupcakes);
-  return cupcakes;
+  return validation.cupcakes;
 }
 
-export async function publishCupcakesToGitHub(cupcakes: WeeklyCupcake[], token: string) {
-  const trimmedToken = token.trim();
+export function createCupcakeId(name: string, existingIds: Iterable<string> = []) {
+  const baseSlug =
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48)
+      .replace(/-$/g, "") || "cupcake";
+  const ids = new Set(existingIds);
+  let suffix = Date.now().toString(36);
+  let candidate = `${baseSlug}-${suffix}`;
 
-  if (!trimmedToken) {
-    throw new Error("Add a GitHub token before publishing.");
+  while (ids.has(candidate)) {
+    suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    candidate = `${baseSlug}-${suffix}`;
   }
 
-  const content = toBase64(JSON.stringify(cupcakes, null, 2) + "\n");
-  let lastError = "Could not publish the cupcake update to GitHub.";
+  return candidate;
+}
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const sha = await getGitHubCupcakeFileSha(trimmedToken);
-    const updateResponse = await fetch(GITHUB_API_URL, {
-      method: "PUT",
-      cache: "no-store",
-      headers: getGitHubHeaders(trimmedToken),
-      body: JSON.stringify({
-        branch: GITHUB_REPO_BRANCH,
-        content,
-        message: "Update weekly cupcakes",
-        sha,
-      }),
-    });
+export function normalizeCupcakePrice(value: string) {
+  const trimmedValue = value.trim();
+  const cleanedValue = trimmedValue.replace(/^\$/, "");
 
-    if (updateResponse.ok) {
-      return;
+  if (
+    !cleanedValue ||
+    cleanedValue.length > MAX_PRICE_LENGTH ||
+    !/^\d+(\.\d{0,2})?$/.test(cleanedValue)
+  ) {
+    return null;
+  }
+
+  const price = Number(cleanedValue);
+
+  if (!Number.isFinite(price) || price <= 0 || price > 9999.99) {
+    return null;
+  }
+
+  return `$${price.toFixed(2)}`;
+}
+
+export function normalizeFlavorOptions(value: string[] | string) {
+  const rawOptions = Array.isArray(value) ? value : value.split(/\r?\n/);
+  const seenOptions = new Set<string>();
+  const options: string[] = [];
+
+  for (const rawOption of rawOptions) {
+    const option = String(rawOption).trim();
+    const optionKey = option.toLowerCase();
+
+    if (!option || seenOptions.has(optionKey)) {
+      continue;
     }
 
-    lastError = await getGitHubErrorMessage(updateResponse, "Could not publish the cupcake update to GitHub.");
+    seenOptions.add(optionKey);
+    options.push(option);
+  }
 
-    if (updateResponse.status !== 409) {
-      break;
+  return options;
+}
+
+function normalizeWeeklyCupcake(
+  value: unknown,
+  index: number,
+  existingIds: Set<string>,
+):
+  | {
+      success: true;
+      cupcake: WeeklyCupcake;
     }
+  | {
+      success: false;
+      error: string;
+    } {
+  const label = `Cupcake ${index + 1}`;
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      success: false,
+      error: `${label} must be an object.`,
+    };
   }
 
-  throw new Error(lastError);
-}
+  const cupcake = value as Partial<Record<keyof WeeklyCupcake, unknown>>;
+  const id = normalizeRequiredString(cupcake.id, `${label} ID`, MAX_ID_LENGTH);
+  const name = normalizeRequiredString(cupcake.name, `${label} name`, MAX_NAME_LENGTH);
+  const blurb = normalizeRequiredString(cupcake.blurb, `${label} blurb`, MAX_BLURB_LENGTH);
 
-async function getGitHubCupcakeFileSha(token: string) {
-  const fileResponse = await fetch(`${GITHUB_API_URL}?ref=${GITHUB_REPO_BRANCH}`, {
-    cache: "no-store",
-    headers: getGitHubHeaders(token),
-  });
-
-  if (!fileResponse.ok) {
-    throw new Error(await getGitHubErrorMessage(fileResponse, "Could not read the cupcake file from GitHub."));
+  if (!id.success) {
+    return id;
   }
 
-  const fileData = (await fileResponse.json()) as { sha?: unknown };
-
-  if (typeof fileData.sha !== "string") {
-    throw new Error("GitHub did not return a file version for the cupcake file.");
+  if (!CUPCAKE_ID_PATTERN.test(id.value)) {
+    return {
+      success: false,
+      error: `${label} ID may only contain lowercase letters, numbers, and hyphens.`,
+    };
   }
 
-  return fileData.sha;
-}
+  if (existingIds.has(id.value)) {
+    return {
+      success: false,
+      error: `Duplicate cupcake ID "${id.value}" found.`,
+    };
+  }
 
-export function createCupcakeId(name: string) {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+  if (!name.success) {
+    return name;
+  }
 
-  return `${slug || "cupcake"}-${Date.now()}`;
-}
+  if (!blurb.success) {
+    return blurb;
+  }
 
-function getCupcakesDataUrl() {
-  return `${SITE_BASE_PATH}${CUPCAKES_PUBLIC_PATH}?v=${Date.now()}`;
-}
+  if (typeof cupcake.price !== "string") {
+    return {
+      success: false,
+      error: `${label} price is required.`,
+    };
+  }
 
-function getGitHubHeaders(token: string) {
+  const price = normalizeCupcakePrice(cupcake.price);
+
+  if (!price) {
+    return {
+      success: false,
+      error: `${label} price must be a positive dollar amount.`,
+    };
+  }
+
+  if (!Array.isArray(cupcake.flavorOptions)) {
+    return {
+      success: false,
+      error: `${label} flavor options must be an array.`,
+    };
+  }
+
+  const flavorOptions = normalizeFlavorOptions(cupcake.flavorOptions);
+
+  if (flavorOptions.length === 0) {
+    return {
+      success: false,
+      error: `${label} needs at least one flavor option.`,
+    };
+  }
+
+  if (flavorOptions.length > MAX_FLAVOR_OPTIONS) {
+    return {
+      success: false,
+      error: `${label} can have ${MAX_FLAVOR_OPTIONS} flavor options or fewer.`,
+    };
+  }
+
+  const longFlavorOption = flavorOptions.find((option) => option.length > MAX_FLAVOR_OPTION_LENGTH);
+
+  if (longFlavorOption) {
+    return {
+      success: false,
+      error: `${label} has a flavor option that is too long.`,
+    };
+  }
+
   return {
-    Accept: "application/vnd.github+json",
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-    "X-GitHub-Api-Version": "2022-11-28",
+    success: true,
+    cupcake: {
+      id: id.value,
+      name: name.value,
+      blurb: blurb.value,
+      price,
+      flavorOptions,
+    },
   };
 }
 
-function toBase64(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  let binaryValue = "";
-
-  bytes.forEach((byte) => {
-    binaryValue += String.fromCharCode(byte);
-  });
-
-  return btoa(binaryValue);
-}
-
-async function getGitHubErrorMessage(response: Response, fallback: string) {
-  try {
-    const data = (await response.json()) as { message?: unknown };
-
-    if (typeof data.message === "string") {
-      return `${fallback} GitHub said: ${data.message}`;
-    }
-  } catch {
-    return fallback;
+function normalizeRequiredString(value: unknown, label: string, maxLength: number) {
+  if (typeof value !== "string") {
+    return {
+      success: false as const,
+      error: `${label} is required.`,
+    };
   }
 
-  return fallback;
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return {
+      success: false as const,
+      error: `${label} is required.`,
+    };
+  }
+
+  if (normalizedValue.length > maxLength) {
+    return {
+      success: false as const,
+      error: `${label} must be ${maxLength} characters or fewer.`,
+    };
+  }
+
+  return {
+    success: true as const,
+    value: normalizedValue,
+  };
+}
+
+function getCupcakesDataUrl() {
+  return `${CUPCAKES_PUBLIC_PATH}?v=${Date.now()}`;
 }

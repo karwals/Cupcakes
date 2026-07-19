@@ -21,6 +21,7 @@ export default function Stepper({
   completeButtonText = 'Complete',
   disableStepIndicators = false,
   renderStepIndicator = undefined,
+  header = /** @type {React.ReactNode} */ (null),
   ...rest
 }) {
   const [currentStep, setCurrentStep] = useState(initialStep);
@@ -33,6 +34,7 @@ export default function Stepper({
   const isLastStep = currentStep === totalSteps;
   const { className: backButtonClassName = '', ...restBackButtonProps } = backButtonProps;
   const { className: nextButtonClassName = '', ...restNextButtonProps } = nextButtonProps;
+  const { className: outerContainerClassName = '', ...restOuterContainerProps } = rest;
   const isNextButtonDisabled = Boolean(restNextButtonProps.disabled) || (isLastStep && isFinalActionPending);
 
   const updateStep = newStep => {
@@ -95,8 +97,9 @@ export default function Stepper({
   };
 
   return (
-    <div className="outer-container" {...rest}>
+    <div className={`outer-container ${outerContainerClassName}`} {...restOuterContainerProps}>
       <div className={`step-circle-container ${stepCircleContainerClassName}`} style={{ border: '1px solid var(--border)' }}>
+        {header}
         <div className={`step-indicator-row ${stepContainerClassName}`}>
           {stepsArray.map((_, index) => {
             const stepNumber = index + 1;
