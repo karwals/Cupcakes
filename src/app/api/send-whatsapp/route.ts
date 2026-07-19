@@ -1,6 +1,6 @@
 const WHATSAPP_GRAPH_API_VERSION = "v25.0";
 const WHATSAPP_TEMPLATE_NAME = "cupcake_order_confirmation";
-const WHATSAPP_TEMPLATE_LANGUAGE = "en_US";
+const WHATSAPP_TEMPLATE_LANGUAGE = "en";
 
 type SendWhatsAppRequest = {
   phone?: unknown;
