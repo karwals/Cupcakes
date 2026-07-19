@@ -2,11 +2,17 @@
 
 import Image from "next/image";
 import { Minus, Plus, ReceiptText, ShoppingBag, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 
 import Stepper, { Step } from "@/components/Stepper";
 import { CupcakeOrderCombobox } from "@/components/cupcake-order-combobox";
+import {
+  PickupTimeWheel,
+  formatPickupTime,
+  isPickupTimeValid,
+  type PickupTime,
+} from "@/components/pickup-time-wheel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,14 +33,6 @@ type OrderSelection = {
   flavor: string;
   price: string;
   quantity: number;
-};
-
-type PickupPeriod = "AM" | "PM";
-
-type PickupTime = {
-  hour: string;
-  minute: string;
-  period: PickupPeriod;
 };
 
 type OrderForm = {
@@ -77,10 +75,6 @@ type PhoneStatus =
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const quantityMinimum = 1;
 const quantityMaximum = 24;
-const pickupHours = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"] as const;
-const pickupMinutes = ["00", "15", "30", "45"] as const;
-const pickupPeriods = ["AM", "PM"] as const;
-
 export function WeeklyCupcakes() {
   const cupcakes = useWeeklyCupcakes();
   const [selectedOrder, setSelectedOrder] = useState<OrderSelection | null>(null);
@@ -500,7 +494,7 @@ export function WeeklyCupcakes() {
                     </label>
                   </div>
 
-                  <PickupTimePicker value={orderForm.pickupTime} onChange={updatePickupTime} />
+                  <PickupTimeWheel value={orderForm.pickupTime} onChange={updatePickupTime} />
 
                   <label className="grid gap-1.5 text-sm font-medium" htmlFor="order-notes">
                     Notes (optional)
@@ -674,199 +668,6 @@ function QuantitySelector({
   );
 }
 
-function PickupTimePicker({
-  value,
-  onChange,
-}: {
-  value: PickupTime;
-  onChange: (value: PickupTime) => void;
-}) {
-  const readableTime = formatPickupTime(value);
-
-  return (
-    <fieldset className="grid gap-3" aria-describedby="pickup-time-preview">
-      <legend className="text-sm font-medium">Choose pickup time</legend>
-      <div className="relative grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-background/60 p-2">
-        <div
-          className="pointer-events-none absolute left-2 right-2 top-1/2 h-10 -translate-y-1/2 rounded-md border border-primary/25 bg-primary/10"
-          aria-hidden="true"
-        />
-        <TimeWheelColumn
-          label="Pickup hour"
-          options={pickupHours}
-          value={value.hour}
-          onChange={(hour) => onChange({ ...value, hour })}
-        />
-        <TimeWheelColumn
-          label="Pickup minute"
-          options={pickupMinutes}
-          value={value.minute}
-          onChange={(minute) => onChange({ ...value, minute })}
-        />
-        <TimeWheelColumn
-          label="Pickup period"
-          options={pickupPeriods}
-          value={value.period}
-          onChange={(period) => onChange({ ...value, period })}
-        />
-      </div>
-      <p id="pickup-time-preview" className="text-xs font-medium text-primary">
-        Pickup at {readableTime}
-      </p>
-    </fieldset>
-  );
-}
-
-function TimeWheelColumn<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly T[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const scrollFrameRef = useRef<number | null>(null);
-  const programmaticScrollRef = useRef(false);
-  const selectedIndex = Math.max(options.indexOf(value), 0);
-
-  useEffect(() => {
-    const selectedButton = optionRefs.current[selectedIndex];
-
-    if (!selectedButton) {
-      return;
-    }
-
-    programmaticScrollRef.current = true;
-    selectedButton.scrollIntoView({ block: "center" });
-
-    const resetTimer = window.setTimeout(() => {
-      programmaticScrollRef.current = false;
-    }, 120);
-
-    return () => window.clearTimeout(resetTimer);
-  }, [selectedIndex]);
-
-  useEffect(
-    () => () => {
-      if (scrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollFrameRef.current);
-      }
-    },
-    [],
-  );
-
-  function handleScroll() {
-    if (programmaticScrollRef.current) {
-      return;
-    }
-
-    if (scrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(scrollFrameRef.current);
-    }
-
-    scrollFrameRef.current = window.requestAnimationFrame(() => {
-      const container = containerRef.current;
-
-      if (!container) {
-        return;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      const centerY = containerRect.top + containerRect.height / 2;
-      let closestIndex = selectedIndex;
-      let closestDistance = Number.POSITIVE_INFINITY;
-
-      optionRefs.current.forEach((button, index) => {
-        if (!button) {
-          return;
-        }
-
-        const buttonRect = button.getBoundingClientRect();
-        const buttonCenterY = buttonRect.top + buttonRect.height / 2;
-        const distance = Math.abs(buttonCenterY - centerY);
-
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
-        }
-      });
-
-      const closestOption = options[closestIndex];
-
-      if (closestOption && closestOption !== value) {
-        onChange(closestOption);
-      }
-    });
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, option: T) {
-    const optionIndex = options.indexOf(option);
-    let nextIndex = optionIndex;
-
-    if (event.key === "ArrowDown") {
-      nextIndex = Math.min(optionIndex + 1, options.length - 1);
-    } else if (event.key === "ArrowUp") {
-      nextIndex = Math.max(optionIndex - 1, 0);
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = options.length - 1;
-    } else {
-      return;
-    }
-
-    event.preventDefault();
-    onChange(options[nextIndex]);
-  }
-
-  return (
-    <div className="relative z-10">
-      <span className="sr-only">{label}</span>
-      <div
-        ref={containerRef}
-        className="h-36 snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-md py-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="group"
-        aria-label={label}
-        onScroll={handleScroll}
-      >
-        {options.map((option, optionIndex) => {
-          const distance = Math.abs(optionIndex - selectedIndex);
-          const isSelected = option === value;
-
-          return (
-            <button
-              key={option}
-              ref={(node) => {
-                optionRefs.current[optionIndex] = node;
-              }}
-              type="button"
-              className={cn(
-                "my-1 flex h-9 w-full snap-center items-center justify-center rounded-md text-sm font-medium transition focus-visible:ring-3 focus-visible:ring-ring/50",
-                isSelected
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-primary/30"
-                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-                distance === 1 && !isSelected && "opacity-75",
-                distance > 1 && "opacity-45",
-              )}
-              aria-pressed={isSelected}
-              aria-label={`${label}: ${option}`}
-              onClick={() => onChange(option)}
-              onKeyDown={(event) => handleKeyDown(event, option)}
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function ReceiptRow({
   label,
   value,
@@ -919,22 +720,6 @@ function getPickupTimeFromDate(date: Date): PickupTime {
     minute: date.getMinutes().toString().padStart(2, "0"),
     period: hour24 >= 12 ? "PM" : "AM",
   };
-}
-
-function isPickupTimeValid(value: PickupTime) {
-  return (
-    pickupHours.some((hour) => hour === value.hour) &&
-    pickupMinutes.some((minute) => minute === value.minute) &&
-    pickupPeriods.some((period) => period === value.period)
-  );
-}
-
-function formatPickupTime(value: PickupTime) {
-  if (!isPickupTimeValid(value)) {
-    return "";
-  }
-
-  return `${Number(value.hour)}:${value.minute} ${value.period}`;
 }
 
 function clampQuantity(quantity: number) {
