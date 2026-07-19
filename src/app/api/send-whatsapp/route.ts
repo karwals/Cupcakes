@@ -1,9 +1,24 @@
 const WHATSAPP_GRAPH_API_VERSION = "v25.0";
-const WHATSAPP_TEMPLATE_NAME = "hello_world";
+const WHATSAPP_TEMPLATE_NAME = "cupcake_order_confirmation";
 const WHATSAPP_TEMPLATE_LANGUAGE = "en_US";
 
 type SendWhatsAppRequest = {
   phone?: unknown;
+  customerName?: unknown;
+  orderReference?: unknown;
+  cupcakeName?: unknown;
+  flavour?: unknown;
+  quantity?: unknown;
+  collectionMethod?: unknown;
+};
+
+type WhatsAppTemplateFields = {
+  customerName: string;
+  orderReference: string;
+  cupcakeName: string;
+  flavour: string;
+  quantity: string;
+  collectionMethod: string;
 };
 
 type MetaApiErrorBody = {
@@ -60,6 +75,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const templateFieldsResult = validateTemplateFields(body);
+
+  if (!templateFieldsResult.success) {
+    return jsonResponse(
+      {
+        success: false,
+        error: templateFieldsResult.error,
+      },
+      400,
+    );
+  }
+
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -96,6 +123,19 @@ export async function POST(request: Request) {
             language: {
               code: WHATSAPP_TEMPLATE_LANGUAGE,
             },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  createTextParameter(templateFieldsResult.fields.customerName),
+                  createTextParameter(templateFieldsResult.fields.orderReference),
+                  createTextParameter(templateFieldsResult.fields.cupcakeName),
+                  createTextParameter(templateFieldsResult.fields.flavour),
+                  createTextParameter(templateFieldsResult.fields.quantity),
+                  createTextParameter(templateFieldsResult.fields.collectionMethod),
+                ],
+              },
+            ],
           },
         }),
       },
@@ -160,6 +200,124 @@ async function parseJsonBody(request: Request): Promise<SendWhatsAppRequest | nu
   } catch {
     return null;
   }
+}
+
+function validateTemplateFields(
+  body: SendWhatsAppRequest,
+):
+  | {
+      success: true;
+      fields: WhatsAppTemplateFields;
+    }
+  | {
+      success: false;
+      error: string;
+    } {
+  const customerName = getRequiredTextField(body.customerName, "customer name");
+  const orderReference = getRequiredTextField(body.orderReference, "order reference");
+  const cupcakeName = getRequiredTextField(body.cupcakeName, "cupcake name");
+  const flavour = getRequiredTextField(body.flavour, "flavour");
+  const quantity = getRequiredQuantityField(body.quantity);
+  const collectionMethod = getRequiredTextField(body.collectionMethod, "collection method");
+
+  if (!customerName.success) {
+    return customerName;
+  }
+
+  if (!orderReference.success) {
+    return orderReference;
+  }
+
+  if (!cupcakeName.success) {
+    return cupcakeName;
+  }
+
+  if (!flavour.success) {
+    return flavour;
+  }
+
+  if (!quantity.success) {
+    return quantity;
+  }
+
+  if (!collectionMethod.success) {
+    return collectionMethod;
+  }
+
+  return {
+    success: true,
+    fields: {
+      customerName: customerName.value,
+      orderReference: orderReference.value,
+      cupcakeName: cupcakeName.value,
+      flavour: flavour.value,
+      quantity: quantity.value,
+      collectionMethod: collectionMethod.value,
+    },
+  };
+}
+
+function getRequiredTextField(
+  value: unknown,
+  label: string,
+):
+  | {
+      success: true;
+      value: string;
+    }
+  | {
+      success: false;
+      error: string;
+    } {
+  if (typeof value !== "string" || !value.trim()) {
+    return {
+      success: false,
+      error: `Please provide a ${label}.`,
+    };
+  }
+
+  return {
+    success: true,
+    value: value.trim(),
+  };
+}
+
+function getRequiredQuantityField(
+  value: unknown,
+):
+  | {
+      success: true;
+      value: string;
+    }
+  | {
+      success: false;
+      error: string;
+    } {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return {
+      success: true,
+      value: String(value),
+    };
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return {
+      success: true,
+      value: value.trim(),
+    };
+  }
+
+  return {
+    success: false,
+    error: "Please provide a valid quantity.",
+  };
+}
+
+function createTextParameter(text: string) {
+  return {
+    type: "text",
+    text,
+  };
 }
 
 function normalizePhoneNumber(
