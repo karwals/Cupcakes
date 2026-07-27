@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import emailjs from "@emailjs/browser";
 import { Minus, Plus, ReceiptText, ShoppingBag, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
@@ -41,40 +42,16 @@ type OrderForm = {
   phone: string;
   pickupTime: PickupTime;
   notes: string;
-  whatsappConsent: boolean;
 };
 
-type TextOrderFormField = Exclude<keyof OrderForm, "pickupTime" | "whatsappConsent">;
-type SendWhatsAppResponse =
-  | {
-      success: true;
-      message: string;
-    }
-  | {
-      success: false;
-      error: string;
-    };
-
-type PhoneStatus =
-  | {
-      status: "empty";
-      value: "";
-      error: "";
-    }
-  | {
-      status: "valid";
-      value: string;
-      error: "";
-    }
-  | {
-      status: "invalid";
-      value: "";
-      error: string;
-    };
+type TextOrderFormField = Exclude<keyof OrderForm, "pickupTime">;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const quantityMinimum = 1;
 const quantityMaximum = 24;
+const emailJsServiceId = "service_tfeama3";
+const emailJsTemplateId = "template_u4tzrun";
+const emailJsPublicKey = "EZA6lstTCXvAx1ogF";
 export function WeeklyCupcakes() {
   const cupcakes = useWeeklyCupcakes();
   const [selectedOrder, setSelectedOrder] = useState<OrderSelection | null>(null);
@@ -89,18 +66,16 @@ export function WeeklyCupcakes() {
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const isCompletingOrderRef = useRef(false);
 
-  const phoneStatus = useMemo(() => normalizeWhatsAppNumber(orderForm.phone), [orderForm.phone]);
   const pickupTimeLabel = formatPickupTime(orderForm.pickupTime);
   const totalAmount = selectedOrder ? formatOrderTotal(selectedOrder.price, selectedOrder.quantity) : "$0.00";
 
   const contactStatus = useMemo(
     () => ({
       name: orderForm.name.trim().length >= 2,
-      email: !orderForm.email.trim() || emailPattern.test(orderForm.email.trim()),
-      whatsapp: phoneStatus.status === "valid",
+      email: emailPattern.test(orderForm.email.trim()),
       pickupTime: Boolean(pickupTimeLabel),
     }),
-    [orderForm.email, orderForm.name, phoneStatus.status, pickupTimeLabel],
+    [orderForm.email, orderForm.name, pickupTimeLabel],
   );
   const canReviewOrder = Boolean(
     selectedOrder &&
@@ -108,10 +83,9 @@ export function WeeklyCupcakes() {
       selectedOrder.quantity >= quantityMinimum &&
       contactStatus.name &&
       contactStatus.email &&
-      contactStatus.whatsapp &&
       contactStatus.pickupTime,
   );
-  const canFinishOrder = canReviewOrder && orderForm.whatsappConsent;
+  const canFinishOrder = canReviewOrder;
 
   useEffect(() => {
     if (!isOrderOpen || orderStep !== 1) {
@@ -170,14 +144,6 @@ export function WeeklyCupcakes() {
         [field]: value,
       }));
     };
-  }
-
-  function updateWhatsAppConsent(event: ChangeEvent<HTMLInputElement>) {
-    setOrderErrorMessage("");
-    setOrderForm((currentForm) => ({
-      ...currentForm,
-      whatsappConsent: event.target.checked,
-    }));
   }
 
   function updatePickupTime(pickupTime: PickupTime) {
@@ -249,7 +215,7 @@ export function WeeklyCupcakes() {
   }
 
   async function completeOrder() {
-    if (!selectedOrder || !canFinishOrder || isCompletingOrderRef.current || phoneStatus.status !== "valid") {
+    if (!selectedOrder || !canFinishOrder || isCompletingOrderRef.current) {
       return false;
     }
 
@@ -259,40 +225,40 @@ export function WeeklyCupcakes() {
 
     const completedOrder = selectedOrder;
     const completedOrderReference = orderReference;
-    const completedWhatsAppNumber = phoneStatus.value;
+    const completedEmail = orderForm.email.trim();
     const completedPickupTime = formatPickupTime(orderForm.pickupTime);
     const completedCollectionMethod = `Pickup at ${completedPickupTime}`;
 
     try {
-      const response = await fetch("/api/send-whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phone: completedWhatsAppNumber,
-          customerName: orderForm.name.trim(),
-          orderReference: completedOrderReference,
-          cupcakeName: completedOrder.cupcakeName,
+      console.log({
+        completedEmail,
+        customer_email: completedEmail,
+        to_email: completedEmail,
+      });
+
+      await emailjs.send(
+        emailJsServiceId,
+        emailJsTemplateId,
+        {
+          to_email: completedEmail,
+          customer_email: completedEmail,
+          customer_name: orderForm.name.trim(),
+          order_reference: completedOrderReference,
+          cupcake_name: completedOrder.cupcakeName,
           flavour: completedOrder.flavor,
           quantity: completedOrder.quantity,
-          collectionMethod: completedCollectionMethod,
-        }),
-      });
-      const responseBody = await readSendWhatsAppResponse(response);
-
-      if (!response.ok || !responseBody?.success) {
-        setOrderErrorMessage(
-          responseBody && !responseBody.success
-            ? responseBody.error
-            : "Unable to send the WhatsApp confirmation. Please try again.",
-        );
-
-        return false;
-      }
+          price_per_cupcake: completedOrder.price,
+          total_price: formatOrderTotal(completedOrder.price, completedOrder.quantity),
+          pickup_time: completedPickupTime,
+          collection_method: completedCollectionMethod,
+          phone: orderForm.phone.trim(),
+          notes: orderForm.notes.trim(),
+        },
+        { publicKey: emailJsPublicKey },
+      );
 
       setOrderMessage(
-        `Receipt ${completedOrderReference} created for ${completedOrder.quantity} x ${completedOrder.cupcakeName}. WhatsApp confirmation sent to ${completedWhatsAppNumber}.`,
+        `Receipt ${completedOrderReference} created for ${completedOrder.quantity} x ${completedOrder.cupcakeName}. A confirmation email has been sent to ${completedEmail}.`,
       );
 
       setIsOrderOpen(false);
@@ -304,7 +270,7 @@ export function WeeklyCupcakes() {
 
       return true;
     } catch {
-      setOrderErrorMessage("Unable to send the WhatsApp confirmation. Please check your connection and try again.");
+      setOrderErrorMessage("We couldn't send your confirmation email. Please check your connection and try again.");
 
       return false;
     } finally {
@@ -451,7 +417,7 @@ export function WeeklyCupcakes() {
                       />
                     </label>
                     <label className="grid gap-1.5 text-sm font-medium" htmlFor="order-email">
-                      Email (optional)
+                      Email
                       <Input
                         id="order-email"
                         type="email"
@@ -459,38 +425,21 @@ export function WeeklyCupcakes() {
                         onChange={updateOrderForm("email")}
                         placeholder="you@example.com"
                         autoComplete="email"
+                        required
                         aria-invalid={orderForm.email.length > 0 && !contactStatus.email}
                       />
                     </label>
                     <label className="grid gap-1.5 text-sm font-medium sm:col-span-2" htmlFor="order-phone">
-                      WhatsApp number
+                      Phone (optional)
                       <Input
                         id="order-phone"
                         type="tel"
                         inputMode="tel"
                         value={orderForm.phone}
                         onChange={updateOrderForm("phone")}
-                        placeholder="0225150330"
+                        placeholder="Your phone number"
                         autoComplete="tel"
-                        aria-describedby="order-whatsapp-preview order-whatsapp-error"
-                        aria-invalid={orderForm.phone.length > 0 && phoneStatus.status === "invalid"}
                       />
-                      <span
-                        id="order-whatsapp-preview"
-                        className={cn(
-                          "text-xs",
-                          phoneStatus.status === "valid" ? "font-medium text-primary" : "text-muted-foreground",
-                        )}
-                      >
-                        {phoneStatus.status === "valid"
-                          ? `WhatsApp confirmation will be sent to ${phoneStatus.value}`
-                          : "Enter a New Zealand mobile number or an international number starting with +."}
-                      </span>
-                      {phoneStatus.status === "invalid" && (
-                        <span id="order-whatsapp-error" className="text-xs font-medium text-destructive" role="alert">
-                          {phoneStatus.error}
-                        </span>
-                      )}
                     </label>
                   </div>
 
@@ -530,28 +479,11 @@ export function WeeklyCupcakes() {
                     </div>
                     <div className="h-px bg-border" />
                     <ReceiptRow label="Name" value={orderForm.name} />
-                    {orderForm.email.trim() && <ReceiptRow label="Email" value={orderForm.email} />}
-                    <ReceiptRow label="WhatsApp number" value={phoneStatus.status === "valid" ? phoneStatus.value : ""} />
+                    <ReceiptRow label="Email" value={orderForm.email} />
+                    {orderForm.phone.trim() && <ReceiptRow label="Phone" value={orderForm.phone} />}
                     <ReceiptRow label="Pickup time" value={`Pickup at ${pickupTimeLabel}`} />
                     {orderForm.notes.trim() && <ReceiptRow label="Notes" value={orderForm.notes} multiline />}
                   </dl>
-                  <label className="flex items-start gap-3 rounded-lg border border-border/70 bg-background/60 p-4 text-sm font-medium">
-                    <input
-                      id="order-whatsapp-consent"
-                      type="checkbox"
-                      checked={orderForm.whatsappConsent}
-                      onChange={updateWhatsAppConsent}
-                      className="mt-0.5 size-4 shrink-0 accent-primary"
-                    />
-                    <span>
-                      I agree to receive order confirmations and updates from Cupcakes through WhatsApp.
-                    </span>
-                  </label>
-                  {!orderForm.whatsappConsent && (
-                    <p className="text-xs text-muted-foreground">
-                      WhatsApp consent is required before finishing the order.
-                    </p>
-                  )}
                   {orderErrorMessage && (
                     <p
                       className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
@@ -692,7 +624,6 @@ function createEmptyOrderForm(): OrderForm {
     phone: "",
     pickupTime: getDefaultPickupTime(),
     notes: "",
-    whatsappConsent: false,
   };
 }
 
@@ -730,76 +661,6 @@ function clampQuantity(quantity: number) {
   return Math.min(Math.max(Math.trunc(quantity), quantityMinimum), quantityMaximum);
 }
 
-function normalizeWhatsAppNumber(value: string): PhoneStatus {
-  const trimmedValue = value.trim();
-
-  if (!trimmedValue) {
-    return {
-      status: "empty",
-      value: "",
-      error: "",
-    };
-  }
-
-  const compactValue = trimmedValue.replace(/[\s().-]/g, "");
-
-  if (compactValue.startsWith("+")) {
-    if (!/^\+\d+$/.test(compactValue)) {
-      return invalidPhoneNumber();
-    }
-
-    return toPhoneStatus(compactValue);
-  }
-
-  if (/[A-Za-z]/.test(trimmedValue)) {
-    return invalidPhoneNumber();
-  }
-
-  const digits = trimmedValue.replace(/\D/g, "");
-
-  if (!digits) {
-    return invalidPhoneNumber();
-  }
-
-  if (digits.startsWith("0")) {
-    return toPhoneStatus(`+64${digits.replace(/^0+/, "")}`);
-  }
-
-  if (digits.startsWith("64")) {
-    return toPhoneStatus(`+${digits}`);
-  }
-
-  if (digits.startsWith("2")) {
-    return toPhoneStatus(`+64${digits}`);
-  }
-
-  return invalidPhoneNumber();
-}
-
-function toPhoneStatus(phoneNumber: string): PhoneStatus {
-  if (!isInternationalMobile(phoneNumber)) {
-    return invalidPhoneNumber();
-  }
-
-  return {
-    status: "valid",
-    value: phoneNumber,
-    error: "",
-  };
-}
-
-function invalidPhoneNumber(): PhoneStatus {
-  return {
-    status: "invalid",
-    value: "",
-    error: "Enter a valid New Zealand mobile number or an international number starting with +.",
-  };
-}
-
-function isInternationalMobile(mobileNumber: string) {
-  return /^\+[1-9]\d{7,14}$/.test(mobileNumber);
-}
-
 function formatOrderTotal(price: string, quantity: number) {
   const unitPrice = Number.parseFloat(price.replace(/[^0-9.]/g, ""));
   const currencyPrefix = price.trim().match(/^[^\d.-]+/)?.[0] ?? "$";
@@ -815,34 +676,4 @@ function createOrderReference() {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
 
   return `VC-${Date.now().toString().slice(-5)}-${suffix}`;
-}
-
-async function readSendWhatsAppResponse(response: Response): Promise<SendWhatsAppResponse | null> {
-  try {
-    const body = (await response.json()) as unknown;
-
-    if (isSendWhatsAppResponse(body)) {
-      return body;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function isSendWhatsAppResponse(value: unknown): value is SendWhatsAppResponse {
-  if (!isRecord(value) || typeof value.success !== "boolean") {
-    return false;
-  }
-
-  if (value.success) {
-    return typeof value.message === "string";
-  }
-
-  return typeof value.error === "string";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object";
 }
